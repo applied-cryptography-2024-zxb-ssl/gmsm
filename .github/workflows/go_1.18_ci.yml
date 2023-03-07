@@ -1,4 +1,4 @@
-name: ci
+name: ci_1.18
 
 on:
   push:
