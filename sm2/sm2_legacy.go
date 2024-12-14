@@ -239,6 +239,7 @@ func randFieldElement(c elliptic.Curve, rand io.Reader) (k *big.Int, err error) 
 	}
 }
 
+// [jbt] sub-method of encrpypt(legacy)
 func encryptLegacy(random io.Reader, pub *ecdsa.PublicKey, msg []byte, opts *EncrypterOpts) ([]byte, error) {
 	curve := pub.Curve
 	msgLen := len(msg)

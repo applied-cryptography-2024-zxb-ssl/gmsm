@@ -41,6 +41,9 @@ const (
 
 // PrivateKey represents an ECDSA SM2 private key.
 // It implemented both crypto.Decrypter and crypto.Signer interfaces.
+// [jbt] Private-Key Struct: extends ecdsa.PrivateKey, priv.D attribute is the 'integer' private key
+// [jbt] priv.PublicKey.X, priv.PublicKey.Y, priv.PublicKey.curve is the 'tuple' of public key
+
 type PrivateKey struct {
 	ecdsa.PrivateKey
 	// inverseOfKeyPlus1 is set under inverseOfKeyPlus1Once
@@ -189,6 +192,7 @@ func (priv *PrivateKey) SignWithSM2(rand io.Reader, uid, msg []byte) ([]byte, er
 // Decrypt decrypts ciphertext msg to plaintext.
 // The opts argument should be appropriate for the primitive used.
 // Compliance with GB/T 32918.4-2016 chapter 7.
+// [jbt] The Decrypt method, and it is the ,method i've simmply tried?
 func (priv *PrivateKey) Decrypt(rand io.Reader, msg []byte, opts crypto.DecrypterOpts) (plaintext []byte, err error) {
 	var sm2Opts *DecrypterOpts
 	sm2Opts, _ = opts.(*DecrypterOpts)
@@ -215,6 +219,8 @@ func EncryptASN1(random io.Reader, pub *ecdsa.PublicKey, msg []byte) ([]byte, er
 // The random parameter is used as a source of entropy to ensure that
 // encrypting the same message twice doesn't result in the same ciphertext.
 // Most applications should use [crypto/rand.Reader] as random.
+
+// [jbt] Encrpypt method, calls encryptSM2EC or encryptLegacy in smw_legacy.go
 func Encrypt(random io.Reader, pub *ecdsa.PublicKey, msg []byte, opts *EncrypterOpts) ([]byte, error) {
 	//A3, requirement is to check if h*P is infinite point, h is 1
 	if pub.X.Sign() == 0 && pub.Y.Sign() == 0 {
@@ -311,6 +317,8 @@ func encodingCiphertextASN1(C1 *_sm2ec.SM2P256Point, c2, c3 []byte) ([]byte, err
 // and may change between calls and/or between versions.
 //
 // According GB/T 32918.1-2016, the private key must be in [1, n-2].
+
+// [jbt] Key Generate method
 func GenerateKey(rand io.Reader) (*PrivateKey, error) {
 	randutil.MaybeReadByte(rand)
 
@@ -392,6 +400,7 @@ func NewPublicKey(key []byte) (*ecdsa.PublicKey, error) {
 
 // Decrypt sm2 decrypt implementation by default DecrypterOpts{C1C3C2}.
 // Compliance with GB/T 32918.4-2016.
+// [jbt] Here is a decypt method, but seems in the test cases i've read it is [not] used
 func Decrypt(priv *PrivateKey, ciphertext []byte) ([]byte, error) {
 	return decrypt(priv, ciphertext, nil)
 }
