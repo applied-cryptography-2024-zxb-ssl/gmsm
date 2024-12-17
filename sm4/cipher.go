@@ -21,6 +21,7 @@ type sm4Cipher struct {
 
 // NewCipher creates and returns a new cipher.Block.
 // The key argument should be the SM4 key,
+// [jbt] Here to be focused
 func NewCipher(key []byte) (cipher.Block, error) {
 	k := len(key)
 	switch k {

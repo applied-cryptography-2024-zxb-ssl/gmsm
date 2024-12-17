@@ -115,6 +115,7 @@ func consumeUint32(b []byte) ([]byte, uint32) {
 // also implements encoding.BinaryMarshaler and
 // encoding.BinaryUnmarshaler to marshal and unmarshal the internal
 // state of the hash.
+// [jbt] core structure
 func New() hash.Hash {
 	d := new(digest)
 	d.Reset()
@@ -209,6 +210,7 @@ func (d *digest) Reset() {
 }
 
 // Sum returns the SM3 checksum of the data.
+// [jbt] This is the i/o
 func Sum(data []byte) [Size]byte {
 	var d digest
 	d.Reset()
