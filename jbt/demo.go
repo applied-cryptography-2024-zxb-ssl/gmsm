@@ -2,14 +2,18 @@ package main
 
 import (
 	"crypto/cipher"
+	"crypto/ecdsa"
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/pem"
 	"fmt"
 	"io"
+	"os"
 
 	"github.com/emmansun/gmsm/sm2"
 	"github.com/emmansun/gmsm/sm3"
 	"github.com/emmansun/gmsm/sm4"
+	"github.com/emmansun/gmsm/smx509"
 )
 
 func main() {
@@ -21,6 +25,69 @@ func main() {
 
 	fmt.Println("\n\n ===========  SM4 Demo ===========")
 	SM4_test()
+}
+
+func save_PrivateKey_To_File(priv_key *sm2.PrivateKey, filePath string) error {
+	fmt.Printf("%T", priv_key)
+	privKeyBytes, err := smx509.MarshalPKCS8PrivateKey(priv_key)
+	if err != nil {
+		return fmt.Errorf("err in get bytes of priv_key: %w", err)
+
+	}
+
+	privKeyPEM := pem.EncodeToMemory(&pem.Block{
+		Type:  "PRIVATE KEY",
+		Bytes: privKeyBytes,
+	})
+
+	err = os.WriteFile(filePath, privKeyPEM, 0644)
+	if err != nil {
+		return fmt.Errorf("err in write priv_key into pem file: %w", err)
+	}
+	return nil
+}
+
+func save_PublicKey_To_File(priv_key *sm2.PrivateKey, filePath string) error {
+	pubKey := priv_key.PublicKey
+	ecdh_key, err := sm2.PublicKeyToECDH(&pubKey)
+	if err != nil {
+		return fmt.Errorf("error in turn pub key to ecdh: %w", err)
+	}
+
+	pubBytes, err := smx509.MarshalPKIXPublicKey(ecdh_key)
+
+	if err != nil {
+		return fmt.Errorf("err in get bytes of pub_key: %w", err)
+	}
+
+	pemBlock := &pem.Block{
+		Type:  "PUBLIC KEY",
+		Bytes: pubBytes,
+	}
+
+	pemData := pem.EncodeToMemory(pemBlock)
+
+	err = os.WriteFile(filePath, pemData, 0644)
+
+	if err != nil {
+		return fmt.Errorf("err in write pub_key into pem file: %w", err)
+	}
+	return nil
+
+}
+
+func ReadPEMFileAsBytes(filePath string) ([]byte, error) {
+	fileContent, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("无法读取文件 %s: %w", filePath, err)
+	}
+
+	block, _ := pem.Decode(fileContent)
+	if block == nil {
+		return nil, fmt.Errorf("无效的 PEM 文件内容")
+	}
+
+	return block.Bytes, nil
 }
 
 // <Requirement(import)>: "github.com/emmansun/gmsm/sm2"
@@ -35,7 +102,60 @@ func SM2_test() {
 	// <Input>: 	rand.Reader
 	// <Output>: 	class *PrivateKey <&&> class error; guarantee one is nil
 	//				class PrivateKey extends ecdsa.PrivateKey("crypto/ecdsa")
-	priv, _ := sm2.GenerateKey(rand.Reader)
+	priv_ori, _ := sm2.GenerateKey(rand.Reader)
+
+	// [2-1] Use Above function to save private key to a given file
+	err := save_PrivateKey_To_File(priv_ori, "./hello_priv.pem")
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	// [2-2] Use Above function to save public key to a given file
+	err = save_PublicKey_To_File(priv_ori, "hello_pub.pem")
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	// [2-3] Retrieve public key
+	pub_pem, err := ReadPEMFileAsBytes("./hello_pub.pem")
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	ori_pub, err := smx509.ParsePKIXPublicKey(pub_pem)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	pub_key, ok := ori_pub.(*ecdsa.PublicKey)
+	if !ok {
+		fmt.Println("Err in retrieve pub key")
+		return
+	}
+
+	// [2-4] Retrieve priv key
+	priv_pem, err := ReadPEMFileAsBytes("./hello_priv.pem")
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	ori_priv, err := smx509.ParsePKCS8PrivateKey(priv_pem)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	priv, ok := ori_priv.(*sm2.PrivateKey)
+	if !ok {
+		fmt.Println("Err in retrieve pub key")
+		return
+	}
+	priv.PublicKey = *pub_key
 
 	// [3] <Func> Use the pre-generated priv to [encrypt] the byte stream
 	// <Input>:		rand.Reader, *priv.PublicKey
@@ -86,6 +206,7 @@ func SM2_test() {
 	} else {
 		fmt.Println("Two different encoding leads to the same reasults?")
 	}
+
 }
 
 // <Requirement(import)>: "github.com/emmansun/gmsm/sm3"
@@ -158,6 +279,7 @@ func SM4_test() {
 	// [7] 	To decrypt, need key(the same as before)
 	// 		nounce(must be the same as the before one in generate)
 	block_2, err := sm4.NewCipher(key)
+
 	if err != nil {
 		panic(err.Error())
 	}
